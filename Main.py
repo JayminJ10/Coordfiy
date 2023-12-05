@@ -25,10 +25,10 @@ cursor.execute("CREATE TABLE IF NOT EXISTS events(server, year, month, day, even
 
 options = (
     "Usage:\n"
-+   "::help     |   Brings up this menu any time\n"
-+   "::add      |   To add an event\n"
++   "::help         |   Brings up this menu any time\n"
++   "::add          |   To add an event\n"
 +   "::remove   |   To remove an event\n"
-+   "::view     |   To view this month"
++   "::view         |   To view this month"
 )
 
 incorrect_add = ("Usage: ::add ['event'] ['(mm/dd/yyyy)']\n*No brackets*")
@@ -40,7 +40,6 @@ async def on_ready():
     for guild in bot.guilds:
         print(guild.name)
         print(guild.id)
-    # main()
 
 @bot.command()
 async def test(ctx):
@@ -58,7 +57,7 @@ def parse_month(mon) -> list:
 def list_itr(results) -> str:
     out = ""
     for entry in results:
-        out += "Date: " + entry[3] + "/" + entry[2] + "/" + entry[1] + "\n"
+        out += "Date: " + entry[2] + "/" + entry[3] + "/" + entry[1] + "\n"
         out += "Event: " + entry[4] + "\n"
         out += "\n"
     return out
@@ -67,11 +66,13 @@ def list_itr(results) -> str:
 async def view(ctx, *args):
     server = str(ctx.message.guild.id)
     if len(args) == 0:
-        thismonth = (datetime.now().month)
-        thisyear = (datetime.now().year)
+        thismonth = str(datetime.now().month)
+        thisyear = str(datetime.now().year)
         print(thismonth)
         print(thisyear)
+        # AND year='{thisyear}' AND month='{thismonth}
         query = f"SELECT * FROM events WHERE server={server} AND year='{thisyear}' AND month='{thismonth}'"
+        print(query)
         res = cursor.execute(query)
         out = cursor.fetchall()
         msg = list_itr(out)
@@ -83,10 +84,11 @@ async def view(ctx, *args):
     elif len(args) == 1:
         if check_err(args[0]):
             await ctx.send(incorrect_view)
+            return False
         else:
             date = parse_month(args[0])
-            day = date[0]
-            month = date[1]
+            month = date[0]
+            day = date[1]
             year = date[2]
             # WHERE server=? AND year=? AND month=? AND day=?"" - (server, year, month, day,)
             query = f"SELECT * FROM events WHERE server={server} AND year='{year}' AND month='{month}' AND day='{day}'"
@@ -101,21 +103,23 @@ async def add(ctx, *args):
     
     if len(args) == 0 or len(args) == 1:
         await ctx.send(incorrect_add)
+        return False
     else:
         if check_err(args[1]):
             await ctx.send(incorrect_add)
+            return False
         else:
             event = args[0]
             date = args[1]
             seperate = parse_month(date)
-            day = seperate[0]
-            month = seperate[1]
+            month = seperate[0]
+            day = seperate[1]
             year = seperate[2]
             query_add = f"INSERT OR IGNORE INTO events (server, year, month, day, event) VALUES ({server}, '{year}', '{month}', '{day}', '{event}')"
             res = cursor.execute(query_add)
             #out = res.fetchone()
-            st = f"Added/Attempted to add: \"{event}\"" + " on " + date + "."
             cursor.connection.commit()
+            st = f"Added/Attempted to add: \"{event}\"" + " on " + date + "."
             await ctx.send(st)
 
 @bot.listen('on_message')
