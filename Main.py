@@ -1,3 +1,5 @@
+## Author: Jaymin Jhaveri
+
 # For env
 from dotenv import load_dotenv
 import os
@@ -11,6 +13,8 @@ from datetime import datetime
 import sqlite3
 # For pattern matching
 import re
+# Testing
+import pytest
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -18,6 +22,9 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 intent = (discord.Intents.all())
 client = discord.Client(intents=intent)
 bot = commands.Bot(command_prefix='::', intents=intent)
+
+## DEBUG ##
+debug = False
 
 sqlcon = sqlite3.connect("coordify.db")
 cursor = sqlcon.cursor()
@@ -49,10 +56,8 @@ async def commands(ctx, *args):
 
 @bot.command()
 async def test(ctx):
-   server = str(ctx.message.guild.id)
-   res = cursor.execute("SELECT name FROM sqlite_master")
-   out = res.fetchone()
-   await ctx.send(out)
+   global testnum
+   testnum = 1
 
 def check_err(month):
     return re.fullmatch("../../....", month) == None
@@ -91,8 +96,10 @@ async def view(ctx, *args):
         print(msg)
         if len(msg) == 0:
             await ctx.send("No events to show")
+            return True
         else:
             await ctx.send(msg)
+            return True
     elif len(args) == 1:
         if check_err(args[0]):
             await ctx.send(incorrect_view)
@@ -107,6 +114,7 @@ async def view(ctx, *args):
             out = cursor.fetchall()
             msg = list_itr(out)
             await ctx.send(msg)
+            return True
 
 @bot.command()
 async def add(ctx, *args):
@@ -121,6 +129,7 @@ async def add(ctx, *args):
             return False
         elif args[1] == ":" or args[1] == "*":
             await ctx.send(no_special)
+            return False
         else:
             event = args[0]
             date = args[1]
@@ -128,20 +137,35 @@ async def add(ctx, *args):
             month = seperate[0]
             day = seperate[1]
             year = seperate[2]
-            query_add = f"INSERT OR IGNORE INTO events (server, year, month, day, event) VALUES ({server}, '{year}', '{month}', '{day}', '{event}')"
-            res = cursor.execute(query_add)
-            cursor.connection.commit()
-            st = f"Added/Attempted to add: \"{event}\"" + " on " + date + "."
-            await ctx.send(st)
+            thismonth = str(datetime.now().month)
+            thisyear = str(datetime.now().year)
+            thisday = str(datetime.now().day)
+            if int(year) < int(thisyear):
+                await ctx.send("Cannot add an event in the past!")
+                return False
+            elif int(month) < int(thismonth):
+                await ctx.send("Cannot add an event in the past!")
+                return False
+            elif int(day) < int(thisday):
+                await ctx.send("Cannot add an event in the past!")
+                return False
+            else:
+                query_add = f"INSERT OR IGNORE INTO events (server, year, month, day, event) VALUES ({server}, '{year}', '{month}', '{day}', '{event}')"
+                res = cursor.execute(query_add)
+                cursor.connection.commit()
+                st = f"Added/Attempted to add: \"{event}\"" + " on " + date + "."
+                await ctx.send(st)
+                return True
 
 @bot.command()
 async def remove(ctx, *args):
     if len(args) == 0:
         await ctx.send(incorrect_remove)
+        return False
     elif len(args) == 1:
         event = args[0]
         if event == "!ALL":
-            query_rem = "DELETE FROM events"
+            query_rem = f"DELETE FROM events WHERE server='{str(ctx.message.guild.id)}'"
             res = cursor.execute(query_rem)
             cursor.connection.commit()
             st = "REMOVED ALL EVENTS"
@@ -172,7 +196,18 @@ async def remove(ctx, *args):
             st = f"Removed/Attempted to remove: \"{event}\" on {month}/{day}/{year}"
             await ctx.send(st)
             return True
-    return False
+
+@bot.command()
+async def debug(ctx, *args):
+    global debug
+    if len(args) != 1:
+        return
+    elif args[0] == "-t":
+        debug = True
+        await ctx.send("Debugging on")
+    elif args[0] == "-f":
+        debug = False
+        await ctx.send("Debugging off")
 
 @bot.listen('on_message')
 async def send(message):
